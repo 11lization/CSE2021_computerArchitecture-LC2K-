@@ -12,6 +12,9 @@
 #define HALT 6
 #define NOOP 7
 
+int pc, last;
+char labels[65536][7];
+
 int readAndParse(FILE *, char *, char *, char *, char *, char *);
 
 int isNumber(char *string){    
@@ -20,9 +23,18 @@ int isNumber(char *string){
     return( (sscanf(string, "%d", &i)) == 1);
 }
 
+int labelAddress(char *label){
+    for(int i = 0; i < last; i++){
+        if(!strcmp(labels[i], label))
+            return i;
+    }
+
+    return -1;
+}
+
 int instructionTypeR(char *arg0, char *arg1, char*arg2){
     if(!isNumber(arg0) && !isNumber(arg1) && !isNumber(arg2)){
-        printf("error: arg is not a number\n")
+        printf("error: arg is not a number\n");
         exit(1);
     }
 
@@ -35,17 +47,42 @@ int instructionTypeR(char *arg0, char *arg1, char*arg2){
 
 int instructionTypeI(char *arg0, char *arg1, char*arg2, int isBeq){
     if(!isNumber(arg0) && !isNumber(arg1)){
-        printf("error: arg is not a number\n")
+        printf("error: arg is not a number\n");
         exit(1);
     }
 
     int regA = atoi(arg0) << 19;
     int regB = atoi(arg1) << 16;
+    int offset;
+
+    if(isNumber(arg2))
+        offset = atoi(arg2);
+    else{
+        if(labelAddress(arg2) == -1){
+            printf("error: undefined label");
+            exit(1);
+        }
+        else
+            offset = labelAddress(arg2);
+        
+        if(isBeq)
+            offset -= pc + 1;
+    }
+
+    if(offset < -32768 || offset > 32767){
+        printf("error: offset don't fit in 16 bits");
+        exit(1);
+    }
+
+    if(isBeq)
+        offset &= 0xFFFF;    
+
+    return regA | regB | offset;
 }
 
 int instructionTypeJ(char *arg0, char *arg1){
     if(!isNumber(arg0) && !isNumber(arg1)){
-        printf("error: arg is not a number\n")
+        printf("error: arg is not a number\n");
         exit(1);
     }
 
@@ -79,12 +116,24 @@ int main(int argc, char *argv[]){
     }
     /* here is an example for how to use readAndParse to read a line from
         inFilePtr */
-    if (! readAndParse(inFilePtr, label, opcode, arg0, arg1, arg2) ) {
-        /* reached end of file */
+    while(readAndParse(inFilePtr, label, opcode, arg0, arg1, arg2)){
+        if(!strcmp(label, "")){
+            pc++;
+            continue;
+        }
+
+        if(labelAddress(label) != -1){
+            printf("error: duplicate labels");
+            exit(1);
+        }
+
+        strcpy(labels[pc++], label);
+        last = pc;
     }
     /* this is how to rewind the file ptr so that you start reading from the
         beginning of the file */
     rewind(inFilePtr);
+    pc = 0;
     /* after doing a readAndParse, you may want to do the following to test the
         opcode */
     while(readAndParse(inFilePtr, label, opcode, arg0, arg1, arg2)){
@@ -101,14 +150,33 @@ int main(int argc, char *argv[]){
         else if(!strcmp(opcode, "beq"))
             machineCode = (BEQ << 22) | instructionTypeI(arg0, arg1, arg2, 1);
         else if(!strcmp(opcode, "jalr"))
-            machineCode = (JALR << 22) | instructionTypeI(arg0, arg1);
+            machineCode = (JALR << 22) | instructionTypeJ(arg0, arg1);
         else if(!strcmp(opcode, "halt"))
             machineCode = HALT << 22;
         else if(!strcmp(opcode, "noop"))
             machineCode = NOOP << 22;
-        else if(!strcmp(opcode, ".fill"))
-
+        else if(!strcmp(opcode, ".fill")){
+            if(isNumber(arg0))
+                machineCode = atoi(arg0);
+            else{
+                if(labelAddress(arg0) == -1){
+                    printf("error: undefined label");
+                    exit(1);
+                }
+                else
+                    machineCode = labelAddress(arg0);
+            }
+        }
+        else
+            printf("error: unrecognized opcode");
+            exit(1);
+        
+        fprintf(outFilePtr, "%d\n", machineCode);
+        printf("(Address %d): %d\n", pc, machineCode);
+        pc++;
+    
     }
+
     return(0);
 }/*
  * Read and parse a line of the assembly-language file.  Fields are returned
@@ -132,11 +200,11 @@ int readAndParse(FILE *inFilePtr, char *label, char *opcode, char *arg0, char *a
         return(0);
     }
     /* check for line too long (by looking for a \n) */
-    if (strchr(line, '\n') == NULL) {
-        /* line too long */
-        printf("error: line too long\n");
-        exit(1);
-    }
+    //if (strchr(line, '\n') == NULL) {
+    //    /* line too long */
+    //    printf("error: line too long\n");
+    //    exit(1);
+    //}
     /* is there a label? */
     ptr = line;
     if (sscanf(ptr, "%[^\t\n\r ]", label)) {
