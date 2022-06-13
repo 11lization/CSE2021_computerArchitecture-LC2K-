@@ -59,7 +59,7 @@ int instructionTypeI(char *arg0, char *arg1, char*arg2, int isBeq){
         offset = atoi(arg2);
     else{
         if(labelAddress(arg2) == -1){
-            printf("error: undefined label");
+            printf("error: undefined label %s\n", arg2);
             exit(1);
         }
         else
@@ -70,7 +70,7 @@ int instructionTypeI(char *arg0, char *arg1, char*arg2, int isBeq){
     }
 
     if(offset < -32768 || offset > 32767){
-        printf("error: offset don't fit in 16 bits");
+        printf("error: offset don't fit in 16 bits\n");
         exit(1);
     }
 
@@ -82,7 +82,7 @@ int instructionTypeI(char *arg0, char *arg1, char*arg2, int isBeq){
 
 int instructionTypeJ(char *arg0, char *arg1){
     if(!isNumber(arg0) && !isNumber(arg1)){
-        printf("error: arg is not a number\n");
+        printf("error: arg is not a number");
         exit(1);
     }
 
@@ -123,7 +123,7 @@ int main(int argc, char *argv[]){
         }
 
         if(labelAddress(label) != -1){
-            printf("error: duplicate labels");
+            printf("error: duplicate label %s\n", label);
             exit(1);
         }
 
@@ -160,16 +160,17 @@ int main(int argc, char *argv[]){
                 machineCode = atoi(arg0);
             else{
                 if(labelAddress(arg0) == -1){
-                    printf("error: undefined label");
+                    printf("error: undefined label\n");
                     exit(1);
                 }
                 else
                     machineCode = labelAddress(arg0);
             }
         }
-        else
-            printf("error: unrecognized opcode");
+        else{
+            printf("error: unrecognized opcode %s\n", opcode);
             exit(1);
+        }
         
         fprintf(outFilePtr, "%d\n", machineCode);
         printf("(Address %d): %d\n", pc, machineCode);
@@ -200,11 +201,11 @@ int readAndParse(FILE *inFilePtr, char *label, char *opcode, char *arg0, char *a
         return(0);
     }
     /* check for line too long (by looking for a \n) */
-    //if (strchr(line, '\n') == NULL) {
-    //    /* line too long */
-    //    printf("error: line too long\n");
-    //    exit(1);
-    //}
+    if (strchr(line, '\n') == NULL) {
+        /* line too long */
+        printf("error: line too long\n");
+        exit(1);
+    }
     /* is there a label? */
     ptr = line;
     if (sscanf(ptr, "%[^\t\n\r ]", label)) {
